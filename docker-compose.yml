@@ -26,14 +26,14 @@ services:
         condition: service_healthy
     environment:
       ENVIRONMENT: development
-      DATABASE_URL: postgresql://postgres:Gurjot%409414@db.bxzmqxjxlztgejjwfbsj.supabase.co:5432/postgres
-      JWT_SECRET_KEY: change-this-secret-in-production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/campusflow}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-secret-in-production}
       LOGIN_RATE_LIMIT_ATTEMPTS: 5
       LOGIN_RATE_LIMIT_WINDOW_SECONDS: 300
       LOGIN_RATE_LIMIT_MAX_KEYS: 10000
-      ADMIN_EMAIL: admin@campusflow.ai
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@campusflow.ai}
       # Generate with: docker compose run --rm backend python scripts/create_admin_hash.py "YourPassword"
-      ADMIN_PASSWORD_HASH: $2b$12$t/9BGM55.0Mc4ql8Q3xmNuqJkvx1FI2Gfse0UmpQfTgFnJgHTX8K6
+      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
       CORS_ORIGINS: '["http://localhost:3000"]'
     ports:
       - "8000:8000"

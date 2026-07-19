@@ -1,3 +1,4 @@
+from dataclasses import Field
 import json
 from functools import lru_cache
 
@@ -24,7 +25,9 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = "admin@campusflow.ai"
     ADMIN_PASSWORD_HASH: str = ""  # set via seed script
 
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    from pydantic import Field
+
+    CORS_ORIGINS: list[str] = Field(default_factory=list)
 
     SOLVER_MAX_TIME_SECONDS: int = 120
     SOLVER_NUM_WORKERS: int = 8

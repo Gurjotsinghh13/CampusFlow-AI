@@ -60,24 +60,28 @@ distinct nav items and two distinct CRUD screens.
 
 ## Quickest start: Docker Compose
 
+Docker Compose starts Postgres, runs Alembic migrations, and boots the
+backend on `:8000` and frontend on `:3000`. One setup step is required
+before you can log in: generate and provide an admin password hash. There
+is no default admin password baked in for security.
+
 ```bash
-docker compose up --build
+# 1. Build the backend image, then generate a bcrypt hash
+docker compose build backend
+docker compose run --rm backend python scripts/create_admin_hash.py "YourStrongPassword"
 ```
 
-This starts Postgres, runs Alembic migrations, and boots the backend on
-`:8000` and frontend on `:3000`. One manual step is required before you
-can log in: generate and provide an admin password hash. There is no
-default admin password baked in for security.
+Create a local `.env` file in the repository root for Compose:
 
 ```bash
-# 1. Generate a bcrypt hash for your chosen admin password
-docker compose run --rm backend python scripts/create_admin_hash.py "YourStrongPassword"
+ADMIN_PASSWORD_HASH=paste-the-printed-hash-here
+JWT_SECRET_KEY=replace-with-a-long-random-secret
+```
 
-# 2. Export the printed hash for Compose, or put it in a local .env file
-export ADMIN_PASSWORD_HASH='paste-the-printed-hash-here'
+Then start the stack:
 
-# 3. Restart
-docker compose up -d backend
+```bash
+docker compose up --build
 ```
 
 Then visit `http://localhost:3000`, sign in with `admin@campusflow.ai`
@@ -116,6 +120,41 @@ npm run dev
 ```
 
 App: `http://localhost:3000` - you'll be redirected to `/login`.
+
+## Security and local secrets
+
+- Never commit plaintext passwords, database credentials, JWT secrets, or
+  generated password hashes.
+- Local `.env` files are ignored by Git. Keep `backend/.env.example` and
+  `frontend/.env.local.example` as templates only.
+- `ADMIN_PASSWORD_HASH` must be a bcrypt hash generated with
+  `backend/scripts/create_admin_hash.py`; the raw admin password is never
+  stored by the application.
+- In production, `ENVIRONMENT=production` requires a non-placeholder
+  `JWT_SECRET_KEY`, a valid `ADMIN_PASSWORD_HASH`, and explicit
+  `CORS_ORIGINS` without `"*"`.
+
+## Verification
+
+Frontend checks:
+
+```bash
+cd frontend
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Backend checks require Python and PostgreSQL or Docker:
+
+```bash
+cd backend
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+Use `/health` for a basic backend liveness check and `/api/v1/openapi.json`
+or `/docs` to inspect the API surface.
 
 ## Using it end to end
 
