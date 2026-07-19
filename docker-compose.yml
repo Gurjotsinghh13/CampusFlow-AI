@@ -1,0 +1,57 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: campusflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - campusflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql://postgres:Gurjot%409414@db.bxzmqxjxlztgejjwfbsj.supabase.co:5432/postgres
+      JWT_SECRET_KEY: change-this-secret-in-production
+      LOGIN_RATE_LIMIT_ATTEMPTS: 5
+      LOGIN_RATE_LIMIT_WINDOW_SECONDS: 300
+      LOGIN_RATE_LIMIT_MAX_KEYS: 10000
+      ADMIN_EMAIL: admin@campusflow.ai
+      # Generate with: docker compose run --rm backend python scripts/create_admin_hash.py "YourPassword"
+      ADMIN_PASSWORD_HASH: $2b$12$t/9BGM55.0Mc4ql8Q3xmNuqJkvx1FI2Gfse0UmpQfTgFnJgHTX8K6
+      CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    ports:
+      - "3000:3000"
+
+volumes:
+  campusflow_db_data:
