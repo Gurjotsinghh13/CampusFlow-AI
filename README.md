@@ -6,6 +6,129 @@ click **Generate Timetable**, and get a conflict-free schedule computed by
 Google OR-Tools CP-SAT - with Student, Faculty, Classroom, and Laboratory
 views, each exportable to PDF and Excel.
 
+## 📸 Screenshots
+
+### Dashboard
+
+![CampusFlow AI Dashboard](docs/screenshots/dashboard.png.png)
+
+### Academic Years
+
+![Academic Years](docs/screenshots/year.png)
+
+### Semesters
+
+![Semesters](docs/screenshots/Semesters.png)
+
+### Departments
+
+![Departments](docs/screenshots/departments.png)
+
+### Divisions
+
+![Divisions](docs/screenshots/divisions.png)
+
+### Faculty
+
+![Faculty](docs/screenshots/faculty.png)
+
+### Subjects
+
+![Subjects](docs/screenshots/subjects.png)
+
+### Constraints
+
+![Constraints](docs/screenshots/constraints.png)
+
+### Generated Timetable
+
+![Generated Timetable](docs/screenshots/timetable_output.png)
+
+## 🌐 Live Demo
+
+Live demo URL:
+
+```text
+Add your deployed frontend URL here
+```
+
+Example:
+
+```text
+https://campusflow-ai.example.com
+```
+
+## 📖 API Docs
+
+When the backend is running locally:
+
+- Swagger UI: `http://localhost:8000/docs`
+- OpenAPI JSON: `http://localhost:8000/api/v1/openapi.json`
+- Health check: `http://localhost:8000/health`
+
+For production deployments, replace `localhost:8000` with your backend
+domain.
+
+## 🏗️ Architecture Diagram
+
+```mermaid
+flowchart LR
+  Admin[Admin User] --> Frontend[Next.js Dashboard]
+  Frontend --> API[FastAPI API]
+  API --> Auth[JWT Auth]
+  API --> Services[Business Services]
+  Services --> Repos[Repositories]
+  Repos --> DB[(PostgreSQL)]
+  Services --> Solver[OR-Tools CP-SAT Solver]
+  Solver --> DB
+  Services --> Export[PDF / Excel Export]
+```
+
+## 🚀 Features
+
+- Authenticated admin dashboard
+- CRUD for departments, academic years, semesters, divisions, subjects,
+  faculty, rooms, laboratories, and scheduling constraints
+- Faculty-to-subject assignment management
+- Singleton institution-wide scheduling configuration
+- CP-SAT timetable generation with precondition validation
+- Student, faculty, classroom, and laboratory timetable views
+- PDF and Excel exports
+- Snapshot-backed generated timetable history
+- Server-side pagination, search, loading states, and toast feedback
+- JWT authentication, login throttling, validation, and normalized API
+  error envelopes
+
+## 🛠️ Tech Stack
+
+**Backend**
+
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Alembic
+- Google OR-Tools CP-SAT
+- Pydantic
+- JWT authentication
+
+**Frontend**
+
+- Next.js 15 App Router
+- React
+- TypeScript
+- Tailwind CSS
+- Radix UI primitives
+- React Hook Form
+- Zod
+- TanStack Table
+- Axios
+
+**Infrastructure**
+
+- Docker / Docker Compose
+- PostgreSQL volume persistence
+- Build-time `NEXT_PUBLIC_API_URL` support for frontend deployments
+
 ## Status: feature-complete
 
 Every module in the spec is implemented on both backend and frontend, end
@@ -58,7 +181,9 @@ distinct nav items and two distinct CRUD screens.
   *blocks*, each `practical_duration_minutes` long (possibly spanning
   multiple periods), using `ceil(hours / block_hours)`.
 
-## Quickest start: Docker Compose
+## ⚙️ Installation Guide
+
+### Quickest start: Docker Compose
 
 Docker Compose starts Postgres, runs Alembic migrations, and boots the
 backend on `:8000` and frontend on `:3000`. One setup step is required
@@ -87,9 +212,9 @@ docker compose up --build
 Then visit `http://localhost:3000`, sign in with `admin@campusflow.ai`
 (or whatever `ADMIN_EMAIL` you set) and the password you just hashed.
 
-## Manual setup
+### Manual setup
 
-### Backend
+#### Backend
 
 ```bash
 cd backend
@@ -108,7 +233,7 @@ uvicorn app.main:app --reload --port 8000
 
 API docs: `http://localhost:8000/docs` - Health check: `http://localhost:8000/health`
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
