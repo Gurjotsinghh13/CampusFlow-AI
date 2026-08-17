@@ -1,237 +1,154 @@
 # CampusFlow AI
 
-AI-powered academic timetable generation platform. An enterprise-style
-admin SaaS: enter departments, faculty, subjects, rooms and constraints,
-click **Generate Timetable**, and get a conflict-free schedule computed by
-Google OR-Tools CP-SAT - with Student, Faculty, Classroom, and Laboratory
-views, each exportable to PDF and Excel.
+**AI-powered academic timetable generation platform.**
+
+Enter departments, faculty, subjects, rooms and constraints, click **Generate Timetable**, and get a conflict-free schedule computed by **Google OR-Tools CP-SAT** — with Student, Faculty, Classroom, and Laboratory views, each exportable to PDF and Excel.
+
+---
+
+## 🌐 Live Deployment
+
+| Service | URL |
+|---------|-----|
+| **Frontend** | https://campus-flow-ai-scheduler.vercel.app/ |
+| **Backend API** | https://campusflow-ai-production.up.railway.app/ |
+| **Swagger Docs** | https://campusflow-ai-production.up.railway.app/docs |
+| **Health Check** | https://campusflow-ai-production.up.railway.app/health |
+
+---
 
 ## 📸 Screenshots
 
 ### Dashboard
-
-![CampusFlow AI Dashboard](docs/screenshots/dashboard.png.png)
-
-### Academic Years
-
-![Academic Years](docs/screenshots/year.png)
-
-### Semesters
-
-![Semesters](docs/screenshots/Semesters.png)
+![Dashboard](docs/screenshots/dashboard.png.png)
 
 ### Departments
-
 ![Departments](docs/screenshots/departments.png)
 
-### Divisions
-
-![Divisions](docs/screenshots/divisions.png)
-
 ### Faculty
-
 ![Faculty](docs/screenshots/faculty.png)
 
 ### Subjects
-
 ![Subjects](docs/screenshots/subjects.png)
 
-### Constraints
+### Divisions
+![Divisions](docs/screenshots/divisions.png)
 
+### Semesters
+![Semesters](docs/screenshots/Semesters.png)
+
+### Academic Years
+![Academic Years](docs/screenshots/year.png)
+
+### Constraint Configuration
 ![Constraints](docs/screenshots/constraints.png)
 
-### Generated Timetable
+### Generated Timetable Output
+![Timetable Output](docs/screenshots/timetable_output.png)
 
-![Generated Timetable](docs/screenshots/timetable_output.png)
+---
 
-## 🌐 Live Demo
-
-Live demo URL:
-
-```text
-Add your deployed frontend URL here
-```
-
-Example:
-
-```text
-https://campusflow-ai.example.com
-```
-
-## 📖 API Docs
-
-When the backend is running locally:
-
-- Swagger UI: `http://localhost:8000/docs`
-- OpenAPI JSON: `http://localhost:8000/api/v1/openapi.json`
-- Health check: `http://localhost:8000/health`
-
-For production deployments, replace `localhost:8000` with your backend
-domain.
-
-## 🏗️ Architecture Diagram
+## 🏗️ Architecture
 
 ```mermaid
 flowchart LR
-  Admin[Admin User] --> Frontend[Next.js Dashboard]
-  Frontend --> API[FastAPI API]
+  Admin[Admin User] --> Frontend[Next.js Dashboard\nVercel]
+  Frontend --> API[FastAPI Backend\nRailway]
   API --> Auth[JWT Auth]
   API --> Services[Business Services]
   Services --> Repos[Repositories]
-  Repos --> DB[(PostgreSQL)]
+  Repos --> DB[(Supabase PostgreSQL)]
   Services --> Solver[OR-Tools CP-SAT Solver]
   Solver --> DB
   Services --> Export[PDF / Excel Export]
 ```
 
+---
+
 ## 🚀 Features
 
-- Authenticated admin dashboard
-- CRUD for departments, academic years, semesters, divisions, subjects,
-  faculty, rooms, laboratories, and scheduling constraints
-- Faculty-to-subject assignment management
-- Singleton institution-wide scheduling configuration
-- CP-SAT timetable generation with precondition validation
-- Student, faculty, classroom, and laboratory timetable views
-- PDF and Excel exports
-- Snapshot-backed generated timetable history
-- Server-side pagination, search, loading states, and toast feedback
-- JWT authentication, login throttling, validation, and normalized API
-  error envelopes
+- **Authenticated admin dashboard** with JWT login and throttled login protection
+- **8 full CRUD modules**: Departments, Academic Years, Semesters, Divisions, Subjects, Faculty, Rooms & Laboratories, Scheduling Constraints
+- **Faculty–subject assignment management** via multi-select checklist
+- **Singleton institution-wide scheduling constraints** (working days, period count, lunch, period durations)
+- **CP-SAT timetable optimization**: precondition validation → boolean-assignment model with hard no-overlap constraints on faculty / room / division and faculty workload caps → time-boxed solve → persistent result
+- **Four timetable views**: Student (Division), Faculty, Classroom, Laboratory — all from a single filterable endpoint
+- **PDF and Excel export** for every view, styled to match the application theme
+- **Snapshot-backed timetable history**: every generation run is stored with its entries
+- **Server-side pagination, search, sorting**, loading skeletons, empty states, toast notifications
+- **Graceful error feedback**: precondition failures surface actionable messages (missing faculty, no lab, etc.)
+
+---
 
 ## 🛠️ Tech Stack
 
 **Backend**
-
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Alembic
-- Google OR-Tools CP-SAT
-- Pydantic
-- JWT authentication
+- Python 3.12 · FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL
+- Google OR-Tools 9 (CP-SAT solver)
+- Pydantic v2 · Pydantic Settings · python-jose (JWT) · passlib + bcrypt
+- openpyxl (Excel) · ReportLab (PDF)
 
 **Frontend**
-
-- Next.js 15 App Router
-- React
-- TypeScript
-- Tailwind CSS
-- Radix UI primitives
-- React Hook Form
-- Zod
-- TanStack Table
-- Axios
+- Next.js 15 (App Router) · React 19 · TypeScript
+- Tailwind CSS · Radix UI primitives
+- React Hook Form · Zod · TanStack Table · Axios · Sonner
 
 **Infrastructure**
+- **Backend**: Docker → Railway
+- **Frontend**: Vercel (Next.js native deployment)
+- **Database**: Supabase PostgreSQL (IPv4 pooler, port 6543)
+- Docker Compose for local full-stack development
 
-- Docker / Docker Compose
-- PostgreSQL volume persistence
-- Build-time `NEXT_PUBLIC_API_URL` support for frontend deployments
+---
 
-## Status: feature-complete
+## ⚙️ Local Setup
 
-Every module in the spec is implemented on both backend and frontend, end
-to end, with no stubs or placeholders.
+### Option A — Docker Compose (recommended)
 
-**Backend** (FastAPI + SQLAlchemy + PostgreSQL + OR-Tools CP-SAT):
-- 8 CRUD modules: Departments, Academic Years, Semesters, Divisions,
-  Subjects, Faculty (with subject-assignment endpoint), Rooms &
-  Laboratories (one `rooms` table filtered by `room_type` - see design
-  note below), Constraints (singleton scheduling config)
-- JWT admin authentication
-- **CP-SAT optimization engine** (`app/services/solver/`): precondition
-  validation -> boolean-assignment model with hard no-overlap constraints
-  on faculty/room/division and faculty daily/weekly workload caps -> a
-  time-boxed solve -> persistence of the result
-- **Generated Timetables API**, including a single filterable
-  `/timetables/{id}/entries` endpoint that serves all four required views
-- **PDF/Excel export** for every view, styled to match the UI theme
-
-**Frontend** (Next.js 15 App Router + TypeScript + Tailwind + shadcn-style
-components on Radix + React Hook Form + Zod + TanStack Table):
-- Enterprise theme matching the brief exactly: dark navy primary, light
-  gray background, white cards, medium radius, no gradients/glassmorphism
-- Auth-guarded dashboard shell with responsive sidebar (all 13 nav items)
-- Full CRUD pages for all 8 modules - search, server-side pagination,
-  sorting via TanStack Table, create/edit dialogs, delete confirmation,
-  loading skeletons, empty states, toast notifications
-- Faculty page includes the subject multi-assignment checklist
-- Generate Timetable page (select academic year -> run solver -> see
-  status/issues/result)
-- Generated Timetables list + detail page with Student/Faculty/Classroom/
-  Laboratory tabs, a live Day x Period grid, and PDF/Excel export buttons
-
-### Design note: Rooms vs Laboratories
-The spec's own **Room Model** has a `room_type` field ("Lab or
-Classroom"), so one `rooms` table serves both - the "Rooms" and
-"Laboratories" sidebar pages filter by `room_type`. This avoids
-duplicating an identical schema in two tables while still giving two
-distinct nav items and two distinct CRUD screens.
-
-### Modeling assumptions (documented, not hidden)
-- `Constraint.number_of_periods` is treated as the number of *teaching*
-  periods in a day - the lunch break is already excluded by whoever
-  configures it; the solver does not additionally carve lunch out of the
-  period grid.
-- `Subject.theory_hours_per_week` is converted to a count of individual
-  one-period theory sessions using `theory_duration_minutes` as the
-  reference period length.
-- `Subject.practical_hours_per_week` is converted to a count of practical
-  *blocks*, each `practical_duration_minutes` long (possibly spanning
-  multiple periods), using `ceil(hours / block_hours)`.
-
-## ⚙️ Installation Guide
-
-### Quickest start: Docker Compose
-
-Docker Compose starts Postgres, runs Alembic migrations, and boots the
-backend on `:8000` and frontend on `:3000`. One setup step is required
-before you can log in: generate and provide an admin password hash. There
-is no default admin password baked in for security.
+Docker Compose starts PostgreSQL, runs Alembic migrations, and boots the backend on `:8000` and frontend on `:3000`.
 
 ```bash
-# 1. Build the backend image, then generate a bcrypt hash
+# 1. Generate a bcrypt hash for the admin password
 docker compose build backend
 docker compose run --rm backend python scripts/create_admin_hash.py "YourStrongPassword"
 ```
 
-Create a local `.env` file in the repository root for Compose:
+Create a `.env` file at the repository root:
 
-```bash
-ADMIN_PASSWORD_HASH=paste-the-printed-hash-here
-JWT_SECRET_KEY=replace-with-a-long-random-secret
+```env
+ADMIN_PASSWORD_HASH=<paste hash from above>
+JWT_SECRET_KEY=<a long random secret>
 ```
 
-Then start the stack:
+Start the stack:
 
 ```bash
 docker compose up --build
 ```
 
-Then visit `http://localhost:3000`, sign in with `admin@campusflow.ai`
-(or whatever `ADMIN_EMAIL` you set) and the password you just hashed.
+Visit `http://localhost:3000` and sign in with `admin@campusflow.ai` and the password you hashed.
 
-### Manual setup
+---
+
+### Option B — Manual Setup
 
 #### Backend
 
 ```bash
 cd backend
-python -m venv .venv && source .venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env: set DATABASE_URL to your Postgres instance
-
+# Edit .env: set DATABASE_URL, then generate and set ADMIN_PASSWORD_HASH
 python scripts/create_admin_hash.py "YourStrongPassword"
-# paste the printed hash into .env as ADMIN_PASSWORD_HASH
-
 alembic upgrade head
-
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: `http://localhost:8000/docs` - Health check: `http://localhost:8000/health`
+| Endpoint | URL |
+|----------|-----|
+| Swagger UI | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
 
 #### Frontend
 
@@ -239,132 +156,149 @@ API docs: `http://localhost:8000/docs` - Health check: `http://localhost:8000/he
 cd frontend
 npm ci
 cp .env.local.example .env.local
-# edit .env.local if your backend isn't on http://localhost:8000
-
+# Edit .env.local if your backend is not on http://localhost:8000
 npm run dev
 ```
 
-App: `http://localhost:3000` - you'll be redirected to `/login`.
+Visit `http://localhost:3000` — you will be redirected to `/login`.
 
-## Security and local secrets
+---
 
-- Never commit plaintext passwords, database credentials, JWT secrets, or
-  generated password hashes.
-- Local `.env` files are ignored by Git. Keep `backend/.env.example` and
-  `frontend/.env.local.example` as templates only.
-- `ADMIN_PASSWORD_HASH` must be a bcrypt hash generated with
-  `backend/scripts/create_admin_hash.py`; the raw admin password is never
-  stored by the application.
-- In production, `ENVIRONMENT=production` requires a non-placeholder
-  `JWT_SECRET_KEY`, a valid `ADMIN_PASSWORD_HASH`, and explicit
-  `CORS_ORIGINS` without `"*"`.
+## 🔒 Security Notes
 
-## Verification
+- Never commit plaintext passwords, database URLs, JWT secrets, or bcrypt hashes.
+- All `.env` files are Git-ignored. Use `.env.example` / `.env.local.example` as templates only.
+- `ADMIN_PASSWORD_HASH` must be a bcrypt hash from `scripts/create_admin_hash.py` — the raw password is never stored.
+- In `ENVIRONMENT=production` mode the application enforces:
+  - `JWT_SECRET_KEY` ≥ 32 characters, not the default placeholder
+  - A non-empty `ADMIN_PASSWORD_HASH` that is a valid bcrypt hash
+  - `CORS_ORIGINS` without `"*"`
 
-Frontend checks:
+---
+
+## ✅ Verification
 
 ```bash
+# Frontend
 cd frontend
 npm run lint
 npm run typecheck
 npm run build
-```
 
-Backend checks require Python and PostgreSQL or Docker:
-
-```bash
+# Backend
 cd backend
-alembic upgrade head
-uvicorn app.main:app --reload --port 8000
+python -m compileall .
 ```
 
-Use `/health` for a basic backend liveness check and `/api/v1/openapi.json`
-or `/docs` to inspect the API surface.
+---
 
-## Using it end to end
+## 🧭 End-to-End Usage
 
-1. Sign in.
-2. Add at least one Department, Academic Year, Semester, and Division.
-3. Add Subjects (theory/practical hours) and Faculty, assigning subjects
-   to faculty who can teach them.
-4. Add Rooms and Laboratories with capacities.
-5. Configure Constraints (working days, hours, lunch, period count).
-6. Go to **Generate Timetable**, pick the academic year, and generate.
-   If data is missing (no faculty for a subject, no lab configured, etc.)
-   you'll get a precise list of what to fix instead of a generic failure.
-7. Open the generated timetable and browse the Student / Faculty /
-   Classroom / Laboratory tabs, or export any of them to PDF or Excel.
+1. **Sign in** at the dashboard.
+2. **Add data** — at minimum: one Department, Academic Year, Semester, Division, Subject (with theory/practical hours), Faculty (assigned to that subject), a Classroom, and optionally a Laboratory.
+3. **Configure Constraints** — working days, periods per day, period duration, lunch break.
+4. **Generate Timetable** — select the academic year and click Generate. Precondition errors surface a precise list of missing data.
+5. **View results** — browse Student / Faculty / Classroom / Laboratory tabs on the detail page.
+6. **Export** — download any view as PDF or Excel.
 
-## Architecture
+---
+
+## 🗂️ Code Structure
 
 ```
 backend/
   app/
-    core/          # config, db session, security, auth dependency
-    models/        # SQLAlchemy ORM models (full schema)
-    schemas/        # Pydantic request/response schemas
-    repositories/   # data-access layer (BaseRepository + per-entity)
-    services/       # business logic / validation layer
-      solver/         # CP-SAT: data_loader, model_builder, solver_service
-      export/          # grid_builder, pdf_export, excel_export
-    routers/        # FastAPI route handlers (thin, delegate to services)
-    utils/          # shared helpers
-    main.py         # app factory, middleware, exception handlers
-  alembic/          # migrations
-  scripts/          # admin utilities
+    core/          # config, database session, security, auth dependency
+    models/        # SQLAlchemy ORM models
+    schemas/       # Pydantic request/response schemas
+    repositories/  # data-access layer (BaseRepository + per-entity repos)
+    services/
+      solver/      # CP-SAT: data_loader → model_builder → solver_service
+      export/      # grid_builder → pdf_export / excel_export
+    routers/       # FastAPI route handlers (thin, delegate to services)
+    utils/
+    main.py        # app factory, CORS, exception handlers, lifespan
+  alembic/         # database migrations
+  scripts/         # admin utilities (create_admin_hash.py)
   Dockerfile
-```
 
-Every module follows: `router -> service -> repository -> model`. Routers
-never touch the DB directly; services own business rules and raise
-`HTTPException`s; repositories own querying via a shared generic base.
-
-```
 frontend/
   app/
-    login/                  # public
-    (dashboard)/             # auth-guarded route group
-      layout.tsx              # sidebar shell + auth guard
-      dashboard/
-      departments/  academic-years/  semesters/  divisions/
-      subjects/     faculty/         rooms/       laboratories/
-      constraints/  generate/        timetables/  timetables/[id]/
+    login/                          # public login page
+    (dashboard)/                    # auth-guarded route group
+      layout.tsx                    # sidebar shell + auth guard
+      dashboard/  departments/  academic-years/  semesters/  divisions/
+      subjects/   faculty/      rooms/           laboratories/
+      constraints/  generate/   timetables/      timetables/[id]/
       settings/
   components/
-    ui/          # hand-written shadcn/ui-pattern primitives (Radix-based)
+    ui/          # Radix-based primitive components
     layout/      # Sidebar, PageHeader, nav config
-    data-table/  # generic DataTable + ConfirmDeleteDialog
-    modules/     # per-module form dialogs + timetable grid/export UI
+    data-table/  # Generic DataTable + ConfirmDeleteDialog
+    modules/     # Per-module form dialogs + timetable grid/export UI
   hooks/
-    use-crud-resource.ts   # shared list/search/paginate/create/update/delete
-    use-options-list.ts    # shared FK dropdown data fetching
+    use-crud-resource.ts   # Unified list / search / paginate / CRUD
+    use-options-list.ts    # FK dropdown data fetching
   lib/
     api-client.ts   # Axios instance, JWT interceptor, response unwrapping
-    types.ts        # TS types mirroring backend Pydantic schemas
-    validators/     # zod schemas per module
+    auth.ts         # Token storage helpers
+    types.ts        # TypeScript types mirroring backend schemas
+    validators/     # Zod schemas per module
   Dockerfile
 ```
 
-Every CRUD module page follows the same pattern: `useCrudResource(endpoint)`
-for data -> `DataTable` for the table -> a per-module `*FormDialog` for
-create/edit -> `ConfirmDeleteDialog` for delete. No page reimplements
-fetch, pagination, or delete-confirmation logic.
+---
 
-## Deployment
+## 🚢 Production Deployment
 
-- **Frontend -> Vercel**: point it at `frontend/`, set `NEXT_PUBLIC_API_URL`
-  to your deployed backend's `/api/v1` URL. For Docker-based frontend
-  deployments, pass the same value as the `NEXT_PUBLIC_API_URL` build arg
-  because Next.js embeds public env vars during `next build`.
-- **Backend -> Railway or Render**: point it at `backend/` (Dockerfile
-  included), set `ENVIRONMENT=production`, `DATABASE_URL`,
-  `JWT_SECRET_KEY` (at least 32 characters), `ADMIN_EMAIL`,
-  `ADMIN_PASSWORD_HASH`, and explicit `CORS_ORIGINS` values without `"*"`.
-  `CORS_ORIGINS` may be a JSON array such as
-  `["https://app.example.com"]` or a comma-separated list.
-  Optionally tune
-  `LOGIN_RATE_LIMIT_ATTEMPTS`, `LOGIN_RATE_LIMIT_WINDOW_SECONDS`,
-  `LOGIN_RATE_LIMIT_MAX_KEYS`, `SOLVER_MAX_TIME_SECONDS`, and
-  `SOLVER_NUM_WORKERS`.
-  Run `alembic upgrade head` as a release/start command before `uvicorn`.
-- **Database**: any managed PostgreSQL (Railway/Render both offer one).
+### Frontend → Vercel
+
+Set the environment variable in your Vercel project settings:
+
+```
+NEXT_PUBLIC_API_URL=https://campusflow-ai-production.up.railway.app/api/v1
+```
+
+### Backend → Railway
+
+Set the following environment variables in Railway:
+
+| Variable | Description |
+|----------|-------------|
+| `ENVIRONMENT` | `production` |
+| `DATABASE_URL` | Supabase IPv4 pooler connection string (port 6543) |
+| `JWT_SECRET_KEY` | Random secret ≥ 32 characters |
+| `ADMIN_EMAIL` | Admin login email |
+| `ADMIN_PASSWORD_HASH` | bcrypt hash from `create_admin_hash.py` |
+| `CORS_ORIGINS` | `["https://campus-flow-ai-scheduler.vercel.app"]` |
+| `SOLVER_MAX_TIME_SECONDS` | (optional) default 120 |
+| `SOLVER_NUM_WORKERS` | (optional) default 8 |
+
+Railway builds and runs the backend using `backend/Dockerfile`. The Dockerfile entry point already handles Railway's dynamically assigned `PORT`:
+
+```dockerfile
+CMD sh -c "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+```
+
+No start command override is needed in Railway. Database migrations (`alembic upgrade head`) should be run manually when schema changes are deployed — for example via a one-off Railway job or the Railway console — rather than as part of the regular container start command.
+
+### Database → Supabase
+
+Use the **IPv4 connection pooler** (port `6543`, mode `transaction`) to avoid IPv6 connectivity issues on Railway.
+
+---
+
+## 🤖 AI / Optimization Notes
+
+The scheduling engine uses **Google OR-Tools CP-SAT** — a production-grade constraint programming solver, not a generative AI or ML model. The system is accurately described as *AI-powered optimization*:
+
+- Hard constraints enforced: no faculty, room, or division double-booking within the same time slot
+- Soft constraints: faculty daily and weekly workload caps
+- The solver is time-boxed (`SOLVER_MAX_TIME_SECONDS`) and fails gracefully if infeasible or timed out
+- Precondition validation runs before the solver to surface data issues immediately, avoiding wasted solve time
+
+---
+
+## 📄 License
+
+MIT
