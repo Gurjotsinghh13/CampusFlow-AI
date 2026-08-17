@@ -1,8 +1,8 @@
 # CampusFlow AI
 
-**AI-powered academic timetable generation platform.**
+**CampusFlow AI is an intelligent academic scheduling platform that automatically generates optimized and conflict-free college timetables.**
 
-Enter departments, faculty, subjects, rooms and constraints, click **Generate Timetable**, and get a conflict-free schedule computed by **Google OR-Tools CP-SAT** — with Student, Faculty, Classroom, and Laboratory views, each exportable to PDF and Excel.
+It takes faculty availability, rooms, subjects, divisions, semesters, and scheduling constraints as input, uses **Google OR-Tools CP-SAT** constraint optimization to generate feasible timetables, and provides a web-based interface for managing academic data, configuring scheduling constraints, generating timetables, and reviewing results. The platform includes a **FastAPI** backend, **Next.js** frontend, and **PostgreSQL** database with **JWT-based authentication**, and is deployed on **Railway** and **Vercel**.
 
 ---
 
