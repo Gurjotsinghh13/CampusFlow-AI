@@ -12,6 +12,13 @@ from app.models.timetable import GeneratedTimetable, GenerationStatus, Timetable
 from app.services.solver.data_loader import SolverValidationError, load_solver_input
 from app.services.solver.model_builder import CPSATModelBuilder, ModelTooLargeError
 
+from app.services.solver.validator import (
+    AssignmentRecord,
+    TimetableValidationError,
+    validate_generated_timetable,
+)
+from app.utils.timeline import get_session_time_range
+
 logger = logging.getLogger("campusflow.solver")
 
 
@@ -81,7 +88,9 @@ class TimetableSolverService:
                 return run
 
             requirements_by_key = {r.key: r for r in solver_input.requirements}
-            entries = []
+            assignment_records: list[AssignmentRecord] = []
+            entries: list[TimetableEntry] = []
+
             for key, var in builder.assignment_vars.items():
                 if solver.Value(var) != 1:
                     continue
@@ -90,6 +99,29 @@ class TimetableSolverService:
                 subject = solver_input.subjects[req.subject_id]
                 faculty = solver_input.faculty[key.faculty_id]
                 room = solver_input.rooms[key.room_id]
+
+                start_time, end_time = get_session_time_range(
+                    period_index=key.start_period,
+                    duration_periods=req.duration_periods,
+                    slots=solver_input.period_slots,
+                )
+
+                assignment_records.append(
+                    AssignmentRecord(
+                        requirement_key=req.key,
+                        division_id=req.division_id,
+                        subject_id=req.subject_id,
+                        faculty_id=key.faculty_id,
+                        room_id=key.room_id,
+                        day=solver_input.days[key.day_idx],
+                        period_index=key.start_period,
+                        duration_periods=req.duration_periods,
+                        session_type=req.session_type.value,
+                        start_time=start_time,
+                        end_time=end_time,
+                    )
+                )
+
                 entries.append(
                     TimetableEntry(
                         timetable_id=run.id,
@@ -108,17 +140,31 @@ class TimetableSolverService:
                     )
                 )
 
+            # Automated validation layer
+            metrics = validate_generated_timetable(
+                solver_input=solver_input,
+                assignments=assignment_records,
+                period_slots=solver_input.period_slots,
+            )
+
             run.status = GenerationStatus.SUCCESS
             run.solver_wall_time_seconds = wall_time
             run.objective_value = solver.ObjectiveValue() if solver_input.requirements else None
+            quality_suffix = f" (Score: {metrics.quality_score}/100, Gaps: {metrics.student_gap_periods})"
             run.message = (
-                "Optimal solution found"
+                f"Optimal solution found{quality_suffix}"
                 if status_code == cp_model.OPTIMAL
-                else "Feasible solution found within time limit"
+                else f"Feasible solution found within time limit{quality_suffix}"
             )
             self.db.add_all(entries)
             self.db.commit()
             self.db.refresh(run)
+        except TimetableValidationError as exc:
+            self._mark_failed(run.id, f"Validation failed: {'; '.join(exc.issues)}")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={"message": "Timetable validation failed", "issues": exc.issues},
+            ) from exc
         except ModelTooLargeError as exc:
             self._mark_failed(run.id, str(exc))
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc

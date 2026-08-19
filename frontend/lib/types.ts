@@ -102,6 +102,16 @@ export interface Constraint {
   updated_at: string;
 }
 
+export interface PeriodSlot {
+  period_index: number;
+  label: string;
+  start_time: string;
+  end_time: string;
+  duration_minutes: number;
+  is_before_lunch: boolean;
+  is_after_lunch: boolean;
+}
+
 export type GenerationStatus = "PENDING" | "RUNNING" | "SUCCESS" | "INFEASIBLE" | "FAILED";
 
 export interface GeneratedTimetable {
@@ -116,6 +126,7 @@ export interface GeneratedTimetable {
   periods_per_day: number;
   theory_duration_minutes: number;
   practical_duration_minutes: number;
+  period_slots?: PeriodSlot[];
   created_at: string;
 }
 
@@ -125,6 +136,8 @@ export interface TimetableEntry {
   id: string;
   day: string;
   period_index: number;
+  start_time?: string;
+  end_time?: string;
   session_type: SessionType;
   division_id: string;
   subject_id: string;

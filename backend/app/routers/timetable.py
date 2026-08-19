@@ -32,9 +32,10 @@ def _validate_single_view_filter(
 
 @router.post("/generate", response_model=APIResponse[GeneratedTimetableRead], status_code=201)
 def generate_timetable(payload: GenerateTimetableRequest, db: Session = Depends(get_db)):
-    obj = GeneratedTimetableService(db).generate(payload.academic_year_id)
+    service = GeneratedTimetableService(db)
+    obj = service.generate(payload.academic_year_id)
     message = "Timetable generated" if obj.status.value == "SUCCESS" else obj.message
-    return APIResponse(message=message, data=GeneratedTimetableRead.model_validate(obj))
+    return APIResponse(message=message, data=service.to_read_dto(obj))
 
 
 @router.get("", response_model=APIResponse[PaginatedResponse[GeneratedTimetableRead]])
@@ -44,10 +45,11 @@ def list_timetables(
     academic_year_id: uuid.UUID | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    items, total = GeneratedTimetableService(db).list_timetables(page, page_size, academic_year_id)
+    service = GeneratedTimetableService(db)
+    items, total = service.list_timetables(page, page_size, academic_year_id)
     return APIResponse(
         data=PaginatedResponse(
-            items=[GeneratedTimetableRead.model_validate(i) for i in items],
+            items=[service.to_read_dto(i) for i in items],
             total=total,
             page=page,
             page_size=page_size,
@@ -58,8 +60,9 @@ def list_timetables(
 
 @router.get("/{timetable_id}", response_model=APIResponse[GeneratedTimetableRead])
 def get_timetable(timetable_id: uuid.UUID, db: Session = Depends(get_db)):
-    obj = GeneratedTimetableService(db).get_timetable(timetable_id)
-    return APIResponse(data=GeneratedTimetableRead.model_validate(obj))
+    service = GeneratedTimetableService(db)
+    obj = service.get_timetable(timetable_id)
+    return APIResponse(data=service.to_read_dto(obj))
 
 
 @router.get("/{timetable_id}/entries", response_model=APIResponse[list[TimetableEntryRead]])
@@ -72,10 +75,12 @@ def get_timetable_entries(
     db: Session = Depends(get_db),
 ):
     _validate_single_view_filter(division_id, faculty_id, room_id, room_type)
-    entries = GeneratedTimetableService(db).get_entries(
+    service = GeneratedTimetableService(db)
+    timetable = service.get_timetable(timetable_id)
+    entries = service.get_entries(
         timetable_id, division_id=division_id, faculty_id=faculty_id, room_id=room_id, room_type=room_type
     )
-    return APIResponse(data=[TimetableEntryRead.model_validate(e) for e in entries])
+    return APIResponse(data=service.to_entry_read_dtos(timetable, entries))
 
 
 @router.get("/{timetable_id}/export/pdf")

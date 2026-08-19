@@ -20,6 +20,10 @@ from app.services.solver.data_types import (
     SolverInput,
     SubjectData,
 )
+from app.utils.timeline import (
+    get_period_schedule_from_constraint,
+    get_valid_start_periods_for_duration,
+)
 
 
 class SolverValidationError(Exception):
@@ -62,6 +66,7 @@ def load_solver_input(db: Session, academic_year_id: UUID) -> SolverInput:
     if constraint is None:
         raise SolverValidationError(["Scheduling constraints have not been configured yet"])
 
+    period_slots = get_period_schedule_from_constraint(constraint)
     period_minutes = constraint.theory_duration_minutes
     practical_block_periods = max(1, math.ceil(constraint.practical_duration_minutes / period_minutes))
     if practical_block_periods > constraint.number_of_periods:
@@ -69,6 +74,13 @@ def load_solver_input(db: Session, academic_year_id: UUID) -> SolverInput:
             "Practical session duration is longer than the entire teaching day - "
             "reduce practical_duration_minutes or increase number_of_periods"
         )
+    elif practical_block_periods > 1:
+        valid_practical_starts = get_valid_start_periods_for_duration(practical_block_periods, period_slots)
+        if not valid_practical_starts:
+            issues.append(
+                f"No continuous {practical_block_periods}-period block fits within daily teaching hours "
+                f"without crossing lunch break ({constraint.lunch_break_start} - {constraint.lunch_break_end})"
+            )
 
     divisions = (
         db.query(Division)
@@ -348,6 +360,11 @@ def load_solver_input(db: Session, academic_year_id: UUID) -> SolverInput:
         periods_per_day=constraint.number_of_periods,
         theory_duration_minutes=constraint.theory_duration_minutes,
         practical_duration_minutes=constraint.practical_duration_minutes,
+        college_start_time=constraint.college_start_time,
+        college_end_time=constraint.college_end_time,
+        lunch_break_start=constraint.lunch_break_start,
+        lunch_break_end=constraint.lunch_break_end,
+        period_slots=period_slots,
         divisions=division_data,
         subjects=subject_data,
         faculty=faculty_data,

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import math
 import uuid
 
 from fastapi import HTTPException, status
@@ -5,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.room import RoomType
 from app.models.timetable import TimetableEntry
+from app.repositories.constraint import ConstraintRepository
 from app.repositories.division import DivisionRepository
 from app.repositories.faculty import FacultyRepository
 from app.repositories.room import RoomRepository
@@ -12,6 +16,7 @@ from app.repositories.timetable import GeneratedTimetableRepository
 from app.services.export.excel_export import build_excel
 from app.services.export.grid_builder import ViewType, build_grid
 from app.services.export.pdf_export import build_pdf
+from app.utils.timeline import get_period_schedule_from_timetable_record
 
 
 class ExportService:
@@ -21,6 +26,7 @@ class ExportService:
         self.division_repo = DivisionRepository(db)
         self.faculty_repo = FacultyRepository(db)
         self.room_repo = RoomRepository(db)
+        self.constraint_repo = ConstraintRepository(db)
 
     def _resolve_view(
         self,
@@ -69,20 +75,25 @@ class ExportService:
         if run is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Generated timetable not found")
 
+        constraint = self.constraint_repo.get_singleton()
+        period_slots = get_period_schedule_from_timetable_record(run, constraint)
+
         entries = self.timetable_repo.get_entries(
             timetable_id, division_id=division_id, faculty_id=faculty_id, room_id=room_id, room_type=room_type
         )
         view_type, title = self._resolve_view(division_id, faculty_id, room_id, room_type, entries)
-        practical_block_periods = max(1, -(-run.practical_duration_minutes // run.theory_duration_minutes))
+        practical_block_periods = max(1, math.ceil(run.practical_duration_minutes / run.theory_duration_minutes))
+
         grid = build_grid(
             entries,
             days=list(run.working_days),
             periods_per_day=run.periods_per_day,
             view_type=view_type,
             practical_block_periods=practical_block_periods,
+            period_slots=period_slots,
             include_room_in_room_view=view_type == ViewType.ROOM and room_id is None,
         )
-        return title, list(run.working_days), run.periods_per_day, grid
+        return title, list(run.working_days), run.periods_per_day, period_slots, grid
 
     def export_pdf(
         self,
@@ -92,10 +103,10 @@ class ExportService:
         room_id: uuid.UUID | None = None,
         room_type: RoomType | None = None,
     ) -> bytes:
-        title, days, periods, grid = self._build_grid_and_title(
+        title, days, periods, period_slots, grid = self._build_grid_and_title(
             timetable_id, division_id, faculty_id, room_id, room_type
         )
-        return build_pdf(title, days, periods, grid)
+        return build_pdf(title, days, periods, period_slots, grid)
 
     def export_excel(
         self,
@@ -105,7 +116,7 @@ class ExportService:
         room_id: uuid.UUID | None = None,
         room_type: RoomType | None = None,
     ) -> bytes:
-        title, days, periods, grid = self._build_grid_and_title(
+        title, days, periods, period_slots, grid = self._build_grid_and_title(
             timetable_id, division_id, faculty_id, room_id, room_type
         )
-        return build_excel(title, days, periods, grid)
+        return build_excel(title, days, periods, period_slots, grid)

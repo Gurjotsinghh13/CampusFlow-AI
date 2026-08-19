@@ -63,14 +63,22 @@ class SessionRequirement:
         return f"{self.division_id}:{self.subject_id}:{self.session_type.value}:{self.session_index}"
 
 
+from app.utils.timeline import PeriodSlot
+
+
 @dataclass
 class SolverInput:
     days: list[str]
     periods_per_day: int
     theory_duration_minutes: int
     practical_duration_minutes: int
-    divisions: dict[UUID, DivisionData]
-    subjects: dict[UUID, SubjectData]
-    faculty: dict[UUID, FacultyData]
-    rooms: dict[UUID, RoomData]
+    college_start_time: str = "09:00"
+    college_end_time: str = "17:00"
+    lunch_break_start: str = "13:00"
+    lunch_break_end: str = "14:00"
+    period_slots: list[PeriodSlot] = field(default_factory=list)
+    divisions: dict[UUID, DivisionData] = field(default_factory=dict)
+    subjects: dict[UUID, SubjectData] = field(default_factory=dict)
+    faculty: dict[UUID, FacultyData] = field(default_factory=dict)
+    rooms: dict[UUID, RoomData] = field(default_factory=dict)
     requirements: list[SessionRequirement] = field(default_factory=list)

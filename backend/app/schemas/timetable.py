@@ -11,12 +11,24 @@ class GenerateTimetableRequest(BaseModel):
     academic_year_id: uuid.UUID
 
 
+class PeriodSlotSchema(BaseModel):
+    period_index: int
+    label: str
+    start_time: str
+    end_time: str
+    duration_minutes: int = 60
+    is_before_lunch: bool = True
+    is_after_lunch: bool = False
+
+
 class TimetableEntryRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     day: str
     period_index: int
+    start_time: str | None = None
+    end_time: str | None = None
     session_type: Literal["THEORY", "PRACTICAL"]
     division_id: uuid.UUID
     subject_id: uuid.UUID
@@ -43,6 +55,7 @@ class GeneratedTimetableRead(BaseModel):
     periods_per_day: int
     theory_duration_minutes: int
     practical_duration_minutes: int
+    period_slots: list[PeriodSlotSchema] = Field(default_factory=list)
     created_at: datetime
 
 

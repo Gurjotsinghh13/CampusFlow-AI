@@ -239,6 +239,7 @@ export default function TimetableDetailPage() {
               days={timetable.working_days}
               periodsPerDay={timetable.periods_per_day}
               practicalBlockPeriods={practicalBlockPeriods}
+              periodSlots={timetable.period_slots}
               viewType={tab === "student" ? "STUDENT" : tab === "faculty" ? "FACULTY" : "ROOM"}
             />
           )}

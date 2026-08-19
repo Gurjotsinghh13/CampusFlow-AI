@@ -4,6 +4,7 @@ from uuid import UUID
 from ortools.sat.python import cp_model
 
 from app.services.solver.data_types import SolverInput
+from app.utils.timeline import is_block_continuous
 
 MAX_MODEL_VARIABLES = 2_000_000
 
@@ -23,10 +24,9 @@ class ModelTooLargeError(Exception):
 
 class CPSATModelBuilder:
     """
-    One boolean variable per (requirement, day, start_period, faculty, room) candidate.
-    Exactly one candidate is chosen per requirement. No-overlap is enforced by
-    capping the number of "occupying" booleans to 1 for every (resource, day, period)
-    triple, which correctly handles multi-period practical sessions.
+    CP-SAT model for academic timetable generation.
+    - Enforces strict hard constraints (no overlaps, room capacity, workload caps, continuous practicals, no lunch crossing).
+    - Optimizes for schedule quality (compact student/faculty schedules, minimized idle gaps, balanced daily loads, sensible distribution).
     """
 
     def __init__(self, data: SolverInput):
@@ -60,6 +60,12 @@ class CPSATModelBuilder:
             self._by_requirement[req.key] = []
             for day_idx in range(n_days):
                 for start_period in range(0, self.data.periods_per_day - req.duration_periods + 1):
+                    # Hard constraint: Multi-period sessions (e.g. 2h practicals) must be continuous
+                    # and must NEVER cross the lunch break boundary.
+                    if req.duration_periods > 1 and self.data.period_slots:
+                        if not is_block_continuous(start_period, req.duration_periods, self.data.period_slots):
+                            continue
+
                     for faculty_id in req.eligible_faculty_ids:
                         for room_id in req.eligible_room_ids:
                             var_count += 1
@@ -100,8 +106,8 @@ class CPSATModelBuilder:
             keys = self._by_requirement.get(req.key, [])
             if not keys:
                 raise ModelTooLargeError(
-                    "No valid (day, time, faculty, room) combination exists for one of the "
-                    "required sessions - check constraints and room capacity"
+                    f"No valid (day, time, faculty, room) combination exists for session '{req.key}' - "
+                    "check room capacity, faculty assignment, and lunch break constraints"
                 )
             self.model.AddExactlyOne(self.assignment_vars[k] for k in keys)
 
@@ -178,13 +184,91 @@ class CPSATModelBuilder:
         self.model.AddMinEquality(min_load, loads)
         return max_load - min_load
 
+    def _add_gap_minimization_terms(
+        self,
+        *,
+        entity_label: str,
+        entity_ids: list[UUID],
+        by_day_period_map: dict[tuple[UUID, int, int], list[cp_model.IntVar]],
+        penalty_weight: int,
+        terms: list,
+    ) -> None:
+        """
+        Penalize internal idle gaps between early and late classes on the same day.
+        A period p (1 <= p <= P-2) is an internal gap if there is at least one class
+        earlier in the day and at least one class later in the day, but period p itself is empty.
+        """
+        n_periods = self.data.periods_per_day
+        if n_periods < 3:
+            return
+
+        for entity_id in entity_ids:
+            for day_idx in range(len(self.data.days)):
+                # Get occupancy indicator for each period p
+                occ_vars: list[cp_model.IntVar] = []
+                for p in range(n_periods):
+                    vars_at_p = by_day_period_map.get((entity_id, day_idx, p), [])
+                    if not vars_at_p:
+                        occ_vars.append(self.model.NewConstant(0))
+                    elif len(vars_at_p) == 1:
+                        occ_vars.append(vars_at_p[0])
+                    else:
+                        # sum(vars_at_p) is at most 1 due to no-overlap constraints
+                        occ_var = self.model.NewBoolVar(f"{entity_label}_occ_{entity_id}_{day_idx}_{p}")
+                        self.model.Add(occ_var == sum(vars_at_p))
+                        occ_vars.append(occ_var)
+
+                # For periods 1 to n_periods - 2, check if earlier and later classes exist
+                for p in range(1, n_periods - 1):
+                    earlier_vars = occ_vars[:p]
+                    later_vars = occ_vars[p + 1:]
+
+                    has_earlier = self.model.NewBoolVar(f"{entity_label}_has_earlier_{entity_id}_{day_idx}_{p}")
+                    has_later = self.model.NewBoolVar(f"{entity_label}_has_later_{entity_id}_{day_idx}_{p}")
+                    is_gap = self.model.NewBoolVar(f"{entity_label}_gap_{entity_id}_{day_idx}_{p}")
+
+                    # has_earlier is true if at least one earlier period is occupied
+                    self.model.AddMaxEquality(has_earlier, earlier_vars)
+                    # has_later is true if at least one later period is occupied
+                    self.model.AddMaxEquality(has_later, later_vars)
+
+                    # is_gap >= has_earlier + has_later - 1 - occ_vars[p]
+                    # If has_earlier=1, has_later=1, and occ_vars[p]=0, then is_gap must be 1.
+                    self.model.Add(is_gap >= has_earlier + has_later - 1 - occ_vars[p])
+
+                    terms.append(penalty_weight * is_gap)
+
     def _add_quality_objective(self) -> None:
-        # Balance the week before preferring earlier periods. The previous objective
-        # rewarded earlier days too strongly, which could pack valid schedules toward
-        # the beginning of the week.
+        """
+        Comprehensive quality objective:
+        1. Student Schedule Compactness (Minimize division idle gaps between classes) - Weight 100
+        2. Faculty Schedule Compactness (Minimize faculty idle gaps between lectures) - Weight 50
+        3. Division Daily Load Balancing (Distribute weekly sessions across working days) - Weight 30
+        4. Faculty Daily Load Balancing - Weight 15
+        5. Mild Core Hours Preference (Penalize extreme late periods >= 5 mildly) - Weight 2
+        """
         terms = []
 
-        for division_id in self.data.divisions:
+        # 1. Division Schedule Compactness (Gap Minimization)
+        self._add_gap_minimization_terms(
+            entity_label="div",
+            entity_ids=list(self.data.divisions.keys()),
+            by_day_period_map=self._by_division_day_period,
+            penalty_weight=100,
+            terms=terms,
+        )
+
+        # 2. Faculty Schedule Compactness (Gap Minimization)
+        self._add_gap_minimization_terms(
+            entity_label="fac",
+            entity_ids=list(self.data.faculty.keys()),
+            by_day_period_map=self._by_faculty_day_period,
+            penalty_weight=50,
+            terms=terms,
+        )
+
+        # 3. Division Daily Load Balancing
+        for division_id, division in self.data.divisions.items():
             loads = self._daily_load_vars(
                 entity_label="division",
                 entity_id=division_id,
@@ -192,7 +276,7 @@ class CPSATModelBuilder:
                 upper_bound=self.data.periods_per_day,
             )
             terms.append(
-                50
+                30
                 * self._load_spread_penalty(
                     entity_label="division",
                     entity_id=division_id,
@@ -201,6 +285,7 @@ class CPSATModelBuilder:
                 )
             )
 
+        # 4. Faculty Daily Load Balancing
         for faculty_id, faculty in self.data.faculty.items():
             loads = self._daily_load_vars(
                 entity_label="faculty",
@@ -209,7 +294,7 @@ class CPSATModelBuilder:
                 upper_bound=faculty.max_daily_lectures,
             )
             terms.append(
-                20
+                15
                 * self._load_spread_penalty(
                     entity_label="faculty",
                     entity_id=faculty_id,
@@ -218,7 +303,10 @@ class CPSATModelBuilder:
                 )
             )
 
+        # 5. Core Hours Preference (Mild soft weight on extreme late periods >= 5)
         for key, var in self.assignment_vars.items():
-            terms.append(key.start_period * var)
+            if key.start_period >= 5:
+                terms.append((key.start_period - 4) * 2 * var)
+
         if terms:
             self.model.Minimize(sum(terms))
