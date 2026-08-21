@@ -3,7 +3,12 @@ import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 import { clearToken, getToken } from "@/lib/auth";
 import type { APIResponse } from "@/lib/types";
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const DEFAULT_API_BASE_URL =
+  process.env.NODE_ENV === "production"
+    ? "https://campusflow-ai-production.up.railway.app/api/v1"
+    : "http://localhost:8000/api/v1";
+
+export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_BASE_URL).replace(/\/+$/, "");
 
 const client = axios.create({ baseURL: API_BASE_URL });
 
